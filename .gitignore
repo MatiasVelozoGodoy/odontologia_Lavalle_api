@@ -1,0 +1,39 @@
+# 📂 Node Modules (evita subir dependencias)
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# ⚙️ Archivos de configuración de entorno
+.env
+.env.local
+.env.development
+.env.production
+
+# Backup
+backups/
+
+# 🔥 Caché y Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+.log
+
+# 📂 Directorios generados automáticamente
+coverage/
+dist/
+build/
+.tmp/
+out/
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# 🚀 Firebase & Cloud Functions
+.firebase/
+functions/node_modules/
