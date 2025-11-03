@@ -47,7 +47,6 @@ const updateUser = async (id, userData) => {
       "email",
       "gender",
       "insurance",
-      "fullName",
       "password",
       "profilePicture",
       "secretQuestion",

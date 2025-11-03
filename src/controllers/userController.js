@@ -1,114 +1,100 @@
-const UserModel = require("../models/userModel");
+const db = require("../firebase");
 
+// ✅ Obtener datos del usuario logueado
+const getCurrentUser = async (req, res) => {
+  try {
+    const userId = req.user.id; // viene del token del authMiddleware
+    const ref = db.collection("users").doc(userId);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    const data = snap.data();
+
+    return res.status(200).json({
+      id: snap.id,
+      fullName: data.fullName,
+      dni: data.dni || null,
+      birthDate: data.birthDate || null,
+      gender: data.gender || null,
+      email: data.email,
+      phone: data.phone || null,
+      insurance: data.insurance || null,
+    });
+  } catch (error) {
+    console.error("Error obteniendo usuario actual:", error);
+    return res.status(500).json({
+      message: "Error obteniendo usuario actual",
+      error: String(error),
+    });
+  }
+};
+
+// ✅ Obtener todos los usuarios (solo si lo usás)
 const getUsers = async (req, res) => {
   try {
-    const { userType } = req.query;
-    const validRoles = ["admin", "cliente"];
-    const state =
-      req.query.state === "true"
-        ? true
-        : req.query.state === "false"
-        ? false
-        : undefined;
-
-    if (userType && !validRoles.includes(userType)) {
-      return res
-        .status(400)
-        .json({ message: "userType no válido (usa 'cliente' o 'admin')" });
-    }
-
-    const users = await UserModel.getUsers(userType, state);
+    const usersRef = db.collection("users");
+    const snapshot = await usersRef.get();
+    const users = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
     return res.status(200).json(users);
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Error obteniendo usuarios", error: String(error) });
+    console.error("Error al obtener usuarios:", error);
+    res.status(500).json({ message: "Error al obtener usuarios" });
   }
 };
 
-// modificar datos del perfil propio
+// ✅ Actualizar usuario
 const updateUser = async (req, res) => {
   try {
-    const user = req.user;
-    const updates = req.body;
-
-    const updated = await UserModel.updateUser(user.id, updates);
-    if (!updated.isOK) {
-      return res.status(404).json({ message: updated.message });
-    }
-
-    return res
-      .status(200)
-      .json({ message: "Usuario actualizado correctamente" });
+    const { id } = req.params;
+    const data = req.body;
+    const ref = db.collection("users").doc(id);
+    await ref.update(data);
+    res.status(200).json({ message: "Usuario actualizado correctamente" });
   } catch (error) {
-    return res
+    res
       .status(500)
       .json({ message: "Error al actualizar usuario", error: String(error) });
   }
 };
 
-// modificar datos de otro usuario (solo admin)
-const updateUserById = async (req, res) => {
-  try {
-    const id = req.params.id;
-    const updates = req.body;
-
-    if (req.user.userType !== "admin") {
-      return res.status(403).json({
-        message:
-          "No autorizado: solo administradores pueden actualizar otros usuarios.",
-      });
-    }
-
-    // impedir que el admin cambie el 'userType' por seguridad
-    // si queres permitirlo, quita este bloque
-    if ("userType" in updates) delete updates.userType;
-
-    const updated = await UserModel.updateUser(id, updates);
-    if (!updated.isOK) {
-      return res.status(404).json({ message: updated.message });
-    }
-
-    return res
-      .status(200)
-      .json({ message: "Usuario actualizado correctamente" });
-  } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Error al actualizar usuario", error: String(error) });
-  }
-};
-
-// eliminar un usuario (solo admin)
+// ✅ Eliminar usuario (soft delete)
 const deleteUser = async (req, res) => {
   try {
-    const id = req.params.id;
-
-    if (req.user.userType !== "admin") {
-      return res.status(403).json({
-        message:
-          "No autorizado: solo administradores pueden eliminar usuarios.",
-      });
-    }
-
-    const deleted = await UserModel.deleteUser(id);
-    if (!deleted.isOK) {
-      return res.status(404).json({ message: deleted.message });
-    }
-
-    return res
-      .status(200)
-      .json({ message: "Usuario eliminado correctamente." });
+    const { id } = req.params;
+    const ref = db.collection("users").doc(id);
+    await ref.update({ state: false });
+    res.status(200).json({ message: "Usuario desactivado" });
   } catch (error) {
-    return res
+    res
       .status(500)
-      .json({ message: "Error eliminando usuario", error: String(error) });
+      .json({ message: "Error al eliminar usuario", error: String(error) });
+  }
+};
+
+// ✅ Reactivar usuario
+const activeUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ref = db.collection("users").doc(id);
+    await ref.update({ state: true });
+    res.status(200).json({ message: "Usuario reactivado" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error al activar usuario", error: String(error) });
   }
 };
 
 module.exports = {
+  getCurrentUser,
   getUsers,
   updateUser,
-  updateUserById,
   deleteUser,
+  activeUser,
 };
