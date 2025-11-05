@@ -14,7 +14,7 @@ function adminOnly(req, res, next) {
 }
 
 // listar stock (solo por admin)
-router.get("/", authMiddleware, stockController.getStock);
+router.get("/", authMiddleware, adminOnly, stockController.getStock);
 
 // crear nuevo producto (solo por admin)
 router.post("/", authMiddleware, adminOnly, stockController.createStock);
