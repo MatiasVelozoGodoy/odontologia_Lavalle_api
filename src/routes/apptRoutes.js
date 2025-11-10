@@ -1,19 +1,11 @@
 const express = require("express");
-const AppointmentController = require("../controllers/apptController");
-const authMiddleware = require("../middlewares/authMiddleware");
-
 const router = express.Router();
+const authMiddleware = require("../middlewares/authMiddleware");
+const apptController = require("../controllers/apptController");
 
-// Cliente
-router.post("/", authMiddleware, AppointmentController.create);
-router.get("/my", authMiddleware, AppointmentController.getByUser);
-
-// Admin
-router.get("/", authMiddleware, AppointmentController.getAll);
-
-// Opcional: update, cancel, delete
-router.put("/:id", authMiddleware, AppointmentController.update);
-router.put("/cancel/:id", authMiddleware, AppointmentController.cancel);
-router.delete("/:id", authMiddleware, AppointmentController.delete);
+router.get("/me", authMiddleware, apptController.getByUser);
+router.post("/", authMiddleware, apptController.createAppointment);
+router.put("/:id", authMiddleware, apptController.updateAppointment); // actualizar genérico
+router.put("/cancel/:id", authMiddleware, apptController.updateAppointment); //  para cancelar
 
 module.exports = router;
