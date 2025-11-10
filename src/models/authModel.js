@@ -1,4 +1,4 @@
-const facade = require("../config/firestoreFacade");
+const { FirebaseFacade: facade } = require("../config/firestoreFacade");
 
 // Buscar usuario por email
 const searchUser = async (email) => {

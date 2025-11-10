@@ -1,4 +1,4 @@
-const facade = require("../config/firestoreFacade");
+const { FirebaseFacade: facade } = require("../config/firestoreFacade");
 
 // Obtener stock
 const getStock = async (category, model) => {

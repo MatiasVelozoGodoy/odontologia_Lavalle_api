@@ -1,18 +1,19 @@
 const express = require("express");
-const router = express.Router();
+const AppointmentController = require("../controllers/apptController");
 const authMiddleware = require("../middlewares/authMiddleware");
-const apptController = require("../controllers/apptController");
 
-// crear turno (pendiente hasta comprobante)
-router.post("/", authMiddleware, apptController.createAppointmentCtrl);
+const router = express.Router();
 
-// confirmar turno subiendo comprobante
-router.put("/confirm", authMiddleware, apptController.confirmAppointmentCtrl);
+// Cliente
+router.post("/", authMiddleware, AppointmentController.create);
+router.get("/my", authMiddleware, AppointmentController.getByUser);
 
-// listar mis turnos
-router.get("/mine", authMiddleware, apptController.getUserAppointmentsCtrl);
+// Admin
+router.get("/", authMiddleware, AppointmentController.getAll);
 
-// listar todos los turnos (solo admin)
-router.get("/", authMiddleware, apptController.getAllAppointmentsCtrl);
+// Opcional: update, cancel, delete
+router.put("/:id", authMiddleware, AppointmentController.update);
+router.put("/cancel/:id", authMiddleware, AppointmentController.cancel);
+router.delete("/:id", authMiddleware, AppointmentController.delete);
 
 module.exports = router;

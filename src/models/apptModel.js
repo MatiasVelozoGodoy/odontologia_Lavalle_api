@@ -1,60 +1,46 @@
-const db = require("../firebase");
+const {
+  FirebaseFacade: firestoreFacade,
+} = require("../config/firestoreFacade");
 
-// crear turno pendiente
-const createAppointment = async ({
-  userId,
-  userEmail,
-  serviceTitle,
-  date,
-  time,
-}) => {
-  const docRef = await db.collection("appointments").add({
-    userId,
-    userEmail,
-    serviceTitle,
-    date,
-    time,
-    status: "pendiente",
-    depositUrl: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-  return { isOK: true, id: docRef.id };
-};
+class AppointmentModel {
+  constructor() {
+    this.collection = "appointments";
+  }
 
-// obtener turno por ID
-const getAppointmentById = async (id) => {
-  const doc = await db.collection("appointments").doc(id).get();
-  if (!doc.exists) return null;
-  return { id: doc.id, ...doc.data() };
-};
+  async getAll() {
+    const docs = await firestoreFacade.getDocuments(this.collection);
+    return docs.map((d) => ({ id: d.id, ...d.data }));
+  }
 
-// actualizar turno (deposito y estado)
-const updateAppointment = async (id, updateData) => {
-  const ref = db.collection("appointments").doc(id);
-  await ref.update({ ...updateData, updatedAt: new Date() });
-  return { isOK: true };
-};
+  async getById(id) {
+    const doc = await firestoreFacade.getDocumentById(this.collection, id);
+    return doc ? { id, ...doc } : null;
+  }
 
-// listar turnos por usuario
-const getAppointmentsByUser = async (userId) => {
-  const snapshot = await db
-    .collection("appointments")
-    .where("userId", "==", userId)
-    .get();
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-};
+  async getByUser(userId) {
+    const docs = await firestoreFacade.getDocuments(this.collection, [
+      { field: "userId", operator: "==", value: userId },
+    ]);
+    return docs.map((d) => ({ id: d.id, ...d.data }));
+  }
 
-// listar turnos para admins
-const getAllAppointments = async () => {
-  const snapshot = await db.collection("appointments").get();
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-};
+  async create(data) {
+    return await firestoreFacade.createDocument(this.collection, data);
+  }
 
-module.exports = {
-  createAppointment,
-  getAppointmentById,
-  updateAppointment,
-  getAppointmentsByUser,
-  getAllAppointments,
-};
+  async update(id, data) {
+    return await firestoreFacade.updateDocument(this.collection, id, data);
+  }
+
+  async cancel(id) {
+    return await firestoreFacade.updateDocument(this.collection, id, {
+      state: "cancelado",
+    });
+  }
+
+  async delete(id) {
+    return await firestoreFacade.deleteDocument(this.collection, id);
+  }
+}
+
+module.exports = new AppointmentModel();

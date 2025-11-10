@@ -1,103 +1,138 @@
-const {
-  createAppointment,
-  getAppointmentById,
-  updateAppointment,
-  getAppointmentsByUser,
-  getAllAppointments,
-} = require("../models/apptModel");
-const { sendInvoiceEmail } = require("../../emailService");
+const { Timestamp } = require("firebase-admin/firestore");
+const AppointmentModel = require("../models/apptModel");
 
-const isTimeValid = (date, time) => {
-  const d = new Date(`${date}T${time}`);
-  const day = d.getDay();
-
-  const hour = d.getHours();
-
-  if ((day === 2 || day === 4) && hour < 12) return false;
-  return true;
-};
-
-const createAppointmentCtrl = async (req, res) => {
+// Crear turno
+const create = async (req, res) => {
   try {
-    const { userId, userEmail, date, time } = req.body;
-    if (!isTimeValid(date, time)) {
-      return res.status(400).json({
-        message: "Turnos no disponibles los martes o jueves a la mañana.",
-      });
-    }
-
-    const result = await createAppointment({
-      userId,
-      userEmail,
-      serviceTitle: "Consulta",
-      date,
-      time,
-    });
-    res.status(201).json(result);
-  } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ message: "Error al crear turno", error: error.message });
-  }
-};
-
-const confirmAppointmentCtrl = async (req, res) => {
-  try {
-    const { appointmentId, depositUrl } = req.body;
-    if (!depositUrl)
+    const { clientId, date, reason, state } = req.body;
+    if (!clientId || !date)
       return res
         .status(400)
-        .json({ message: "Debe subir el comprobante de depósito." });
+        .json({ message: "Faltan campos obligatorios (userId o date)" });
 
-    const appt = await getAppointmentById(appointmentId);
-    if (!appt) return res.status(404).json({ message: "Turno no encontrado" });
+    const appointmentDate = Timestamp.fromDate(new Date(date));
 
-    await updateAppointment(appointmentId, { depositUrl, status: "confirmed" });
+    const newAppointment = {
+      clientId,
+      date: appointmentDate,
+      reason: reason || "consulta",
+      state: state || "pendiente",
+      createdAt: Timestamp.now(),
+    };
 
-    await sendInvoiceEmail({
-      to: appt.userEmail,
-      subject: "Turno confirmado - Odontología Lavalle",
-      text: `Tu turno para ${appt.serviceTitle} fue confirmado para el ${appt.date} a las ${appt.time}.`,
+    const result = await AppointmentModel.create(newAppointment);
+
+    return res.status(201).json({
+      message: "Turno agendado correctamente",
+      id: result.id,
     });
-
-    res.json({ isOK: true, message: "Turno confirmado y email enviado" });
   } catch (error) {
-    console.error(error);
-    res
+    console.error("Error al crear turno:", error);
+    return res
       .status(500)
-      .json({ message: "Error al confirmar turno", error: error.message });
+      .json({ message: "Error al crear turno", error: String(error) });
   }
 };
 
-const getUserAppointmentsCtrl = async (req, res) => {
+// Obtener todos los turnos (admin)
+const getAll = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const appointments = await getAppointmentsByUser(userId);
-    res.json(appointments);
+    const appointments = await AppointmentModel.getAll();
+    const formatted = appointments.map((a) => ({
+      ...a,
+      date: a.date?.toDate
+        ? a.date.toDate().toLocaleString("es-AR", {
+            timeZone: "America/Argentina/Buenos_Aires",
+            hour12: true,
+          })
+        : a.date,
+    }));
+    return res.status(200).json(formatted);
   } catch (error) {
-    console.error(error);
-    res
+    console.error("Error obteniendo turnos:", error);
+    return res
       .status(500)
-      .json({ message: "Error al obtener turnos", error: error.message });
+      .json({ message: "Error obteniendo turnos", error: String(error) });
   }
 };
 
-const getAllAppointmentsCtrl = async (req, res) => {
+// Obtener turnos del usuario logueado
+const getByUser = async (req, res) => {
   try {
-    const appointments = await getAllAppointments();
-    res.json(appointments);
+    const clientId = req.user?.id;
+    if (!clientId)
+      return res.status(401).json({ message: "Usuario no autenticado" });
+
+    const appointments = await AppointmentModel.getByUser(clientId);
+    const formatted = appointments.map((a) => ({
+      ...a,
+      date: a.date?.toDate
+        ? a.date.toDate().toLocaleString("es-AR", {
+            timeZone: "America/Argentina/Buenos_Aires",
+            hour12: true,
+          })
+        : a.date,
+    }));
+    return res.status(200).json(formatted);
   } catch (error) {
-    console.error(error);
-    res
+    console.error("Error obteniendo turnos del usuario:", error);
+    return res.status(500).json({
+      message: "Error obteniendo turnos del usuario",
+      error: String(error),
+    });
+  }
+};
+
+// Actualizar turno
+const update = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+    const updated = await AppointmentModel.update(id, data);
+    if (!updated)
+      return res.status(404).json({ message: "Turno no encontrado" });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Error actualizando turno:", error);
+    return res
       .status(500)
-      .json({ message: "Error al obtener turnos", error: error.message });
+      .json({ message: "Error actualizando turno", error: String(error) });
+  }
+};
+
+// Cancelar turno
+const cancel = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updated = await AppointmentModel.cancel(id);
+    return res.json(updated);
+  } catch (error) {
+    console.error("Error cancelando turno:", error);
+    return res
+      .status(500)
+      .json({ message: "Error cancelando turno", error: String(error) });
+  }
+};
+
+// Eliminar turno
+const deleteAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await AppointmentModel.delete(id);
+    return res.json({ message: "Turno eliminado correctamente" });
+  } catch (error) {
+    console.error("Error eliminando turno:", error);
+    return res
+      .status(500)
+      .json({ message: "Error eliminando turno", error: String(error) });
   }
 };
 
 module.exports = {
-  createAppointmentCtrl,
-  confirmAppointmentCtrl,
-  getUserAppointmentsCtrl,
-  getAllAppointmentsCtrl,
+  create,
+  getAll,
+  getByUser,
+  update,
+  cancel,
+  delete: deleteAppointment,
 };

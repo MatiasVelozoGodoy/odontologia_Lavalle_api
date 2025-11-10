@@ -1,4 +1,4 @@
-const facade = require("../config/firestoreFacade");
+const { FirebaseFacade: facade } = require("../config/firestoreFacade");
 
 // Obtener lista de usuarios (con filtros opcionales)
 const getUsers = async (userType, state) => {
