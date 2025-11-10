@@ -1,33 +1,45 @@
-const db = require("../firebase");
+const facade = require("../config/firestoreFacade");
 
-const searchUser = async(email) => {
-    const snapshot = await db.collection("users")
-                                .where("email", "==", email)
-                                .limit(1)
-                                .get();
-    
-    return snapshot.empty ? null : snapshot.docs[0];
+// Buscar usuario por email
+const searchUser = async (email) => {
+  try {
+    return await facade.findDocumentByField("users", "email", email);
+  } catch (error) {
+    console.error("Error buscando usuario:", error);
+    return null;
+  }
 };
 
-const addUser = async(userData) => {  
-    return await db.collection("users").add(userData);
+// Agregar nuevo usuario
+const addUser = async (userData) => {
+  try {
+    return await facade.createDocument("users", userData);
+  } catch (error) {
+    console.error("Error agregando usuario:", error);
+    throw error;
+  }
 };
 
+// Restablecer contraseña (genera una nueva aleatoria)
 const resetPassword = async (email) => {
-    const snapshot = await db.collection("users")
-                            .where("email", "==", email)
-                            .limit(1)
-                            .get();
+  try {
+    const user = await searchUser(email);
+    if (!user) return null;
 
-    if (snapshot.empty) return null;
+    const newPassword = Math.random().toString(36).slice(-8);
 
-    const userDoc = snapshot.docs[0];
-    const userId = userDoc.id;
+    await facade.updateDocument("users", user.id, { password: newPassword });
 
-    const newPassword = "pass123";
-    await db.collection("users").doc(userId).update({ password: newPassword });
-
-    return userId;
+    console.log(`Nueva contraseña para ${email}: ${newPassword}`);
+    return user.id;
+  } catch (error) {
+    console.error("Error restableciendo contraseña:", error);
+    return null;
+  }
 };
 
-module.exports = { searchUser, addUser, resetPassword };
+module.exports = {
+  searchUser,
+  addUser,
+  resetPassword,
+};

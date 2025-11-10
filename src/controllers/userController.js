@@ -1,7 +1,7 @@
 const UserModel = require("../models/userModel");
 const { Timestamp } = require("firebase-admin/firestore");
 
-// 🔹 Convierte DD/MM/YYYY a Timestamp
+// Convierte DD/MM/YYYY a Timestamp
 function parseDateDDMMYYYY(input) {
   if (!input) return null;
 
@@ -22,7 +22,7 @@ function parseDateDDMMYYYY(input) {
   return isNaN(d.getTime()) ? null : Timestamp.fromDate(d);
 }
 
-// 🔹 Obtener todos los usuarios (opcionalmente filtrados)
+//  Obtener todos los usuarios (opcionalmente filtrados)
 const getUsers = async (req, res) => {
   try {
     const { userType } = req.query;
@@ -49,7 +49,10 @@ const getUsers = async (req, res) => {
   }
 };
 
-// 🔹 Modificar datos del perfil propio
+// Esta función permite que un usuario modifique sus propios datos personales.
+// Si se incluye la fecha de nacimiento, se convierte al formato estándar antes de guardar.
+// Retorna un mensaje de éxito o error según el resultado de la operación.
+
 const updateUser = async (req, res) => {
   try {
     const user = req.user;
@@ -74,7 +77,11 @@ const updateUser = async (req, res) => {
   }
 };
 
-// 🔹 Modificar datos de otro usuario (solo admin)
+// Esta función permite a un administrador modificar la información de cualquier usuario.
+// Se bloquea la modificación del campo 'userType' para evitar escalamiento de privilegios.
+// La fecha de nacimiento se convierte al formato estándar si está presente.
+// Retorna un mensaje de éxito o error según el resultado de la operación.
+
 const updateUserById = async (req, res) => {
   try {
     const id = req.params.id;
@@ -108,7 +115,7 @@ const updateUserById = async (req, res) => {
   }
 };
 
-// 🔹 Eliminar un usuario (solo admin)
+//  Eliminar un usuario (solo admin)
 const deleteUser = async (req, res) => {
   try {
     const id = req.params.id;
@@ -135,7 +142,7 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// 🔹 Obtener el usuario actual
+//  Obtener el usuario actual
 const getCurrentUser = async (req, res) => {
   try {
     const userId = req.user.id;

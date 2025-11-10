@@ -1,32 +1,24 @@
-const db = require("../firebase");
+const facade = require("../config/firestoreFacade");
 
+// Obtener stock
 const getStock = async (category, model) => {
-  let query = db.collection("stock").where("state", "==", true);
+  try {
+    console.log("Obteniendo stock desde Facade...");
 
-  if (category) query = query.where("category", "==", category);
-  if (model) query = query.where("model", "==", model);
+    const filters = [{ field: "state", operator: "==", value: true }];
 
-  const snapshot = await query.get();
+    if (category)
+      filters.push({ field: "category", operator: "==", value: category });
+    if (model) filters.push({ field: "model", operator: "==", value: model });
 
-  return snapshot.docs.map((doc) => {
-    const data = doc.data();
-
-    const stock = {
-      id: doc.id,
-      product: data.product,
-      category: data.category,
-      quantity: data.quantity,
-      price: data.price,
-      unit: data.unit,
-      state: data.state,
-    };
-
-    if (data.expirationDate) stock.expirationDate = data.expirationDate;
-
-    return stock;
-  });
+    return await facade.getDocuments("stock", filters);
+  } catch (error) {
+    console.error("Error al obtener stock:", error);
+    throw error;
+  }
 };
 
+// Crear nuevo stock
 const createStock = async (data) => {
   try {
     const required = ["product", "category", "quantity", "price", "unit"];
@@ -44,8 +36,12 @@ const createStock = async (data) => {
       state: true,
     };
 
-    const ref = await db.collection("stock").add(newItem);
-    return { isOK: true, id: ref.id, message: "Stock creado correctamente." };
+    const result = await facade.createDocument("stock", newItem);
+    return {
+      isOK: true,
+      id: result.id,
+      message: "Stock creado correctamente.",
+    };
   } catch (error) {
     return {
       isOK: false,
@@ -55,14 +51,9 @@ const createStock = async (data) => {
   }
 };
 
+// Actualizar stock existente
 const updateStock = async (id, data) => {
   try {
-    const ref = db.collection("stock").doc(id);
-    const snap = await ref.get();
-
-    if (!snap.exists)
-      return { isOK: false, message: "No se encontró el producto." };
-
     const allowed = new Set([
       "product",
       "category",
@@ -82,7 +73,10 @@ const updateStock = async (id, data) => {
 
     sanitized.updatedAt = new Date();
 
-    await ref.update(sanitized);
+    const result = await facade.updateDocument("stock", id, sanitized);
+
+    if (!result.success) return { isOK: false, message: result.message };
+
     return { isOK: true, message: "Stock actualizado correctamente." };
   } catch (error) {
     return {
@@ -93,15 +87,12 @@ const updateStock = async (id, data) => {
   }
 };
 
+// Eliminación lógica de producto
 const deleteStock = async (id) => {
   try {
-    const ref = db.collection("stock").doc(id);
-    const snap = await ref.get();
+    const result = await facade.deleteDocument("stock", id);
 
-    if (!snap.exists)
-      return { isOK: false, message: "No se encontró el producto." };
-
-    await ref.update({ state: false, updatedAt: new Date() });
+    if (!result.success) return { isOK: false, message: result.message };
 
     return {
       isOK: true,

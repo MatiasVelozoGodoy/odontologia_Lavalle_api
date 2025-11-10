@@ -1,86 +1,34 @@
-const db = require("../firebase");
+const facade = require("../config/firestoreFacade");
 
-// 🔹 Convierte Timestamp a DD/MM/YYYY
-function formatDate(timestamp) {
-  if (!timestamp || !timestamp.toDate) return null;
-  const date = timestamp.toDate();
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
-}
-
-// 🔹 Obtener lista de usuarios (con filtros opcionales)
+// Obtener lista de usuarios (con filtros opcionales)
 const getUsers = async (userType, state) => {
-  let query = db.collection("users");
-  if (userType) query = query.where("userType", "==", userType);
-  if (state !== undefined) query = query.where("state", "==", state);
+  const filters = [];
 
-  const snapshot = await query.get();
+  if (userType)
+    filters.push({ field: "userType", operator: "==", value: userType });
+  if (state !== undefined)
+    filters.push({ field: "state", operator: "==", value: state });
 
-  return snapshot.docs.map((doc) => {
-    const data = doc.data();
+  const users = await facade.getDocuments("users", filters);
 
-    const user = {
-      id: doc.id,
-      userType: data.userType,
-      fullName: data.fullName,
-      email: data.email,
-      state: data.state,
-    };
-
-    if (data.phone) user.phone = data.phone;
-    if (data.dni) user.dni = data.dni;
-    if (data.gender) user.gender = data.gender;
-    if (data.insurance) user.insurance = data.insurance;
-    if (data.communication) user.communication = data.communication;
-    if (data.birthDate) user.birthDate = formatDate(data.birthDate); // ✅ Conversión
-    if (data.profilePicture) user.profilePicture = data.profilePicture;
-    if (data.secretQuestion) user.secretQuestion = data.secretQuestion;
-
-    return user;
-  });
+  return users.map((user) => facade.formatDatesInDocument(user, ["birthDate"]));
 };
 
-// 🔹 Obtener un usuario por ID
+// Obtener un usuario por ID
 const getUserById = async (id) => {
   try {
-    const ref = db.collection("users").doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) return null;
+    const user = await facade.getDocumentById("users", id);
+    if (!user) return null;
 
-    const data = snap.data();
-    const user = {
-      id: snap.id,
-      userType: data.userType,
-      fullName: data.fullName,
-      email: data.email,
-      state: data.state,
-    };
-
-    if (data.phone) user.phone = data.phone;
-    if (data.dni) user.dni = data.dni;
-    if (data.gender) user.gender = data.gender;
-    if (data.insurance) user.insurance = data.insurance;
-    if (data.communication) user.communication = data.communication;
-    if (data.birthDate) user.birthDate = formatDate(data.birthDate); // ✅ Conversión
-    if (data.profilePicture) user.profilePicture = data.profilePicture;
-    if (data.secretQuestion) user.secretQuestion = data.secretQuestion;
-
-    return user;
+    return facade.formatDatesInDocument(user, ["birthDate"]);
   } catch {
     return null;
   }
 };
 
-// 🔹 Actualizar un usuario por ID (con validación de campos permitidos)
+// Actualizar un usuario por ID
 const updateUser = async (id, userData) => {
   try {
-    const ref = db.collection("users").doc(id);
-    const snap = await ref.get();
-    if (!snap.exists)
-      return { isOK: false, message: "No se encontró el usuario" };
-
     const allowed = new Set([
       "communication",
       "dni",
@@ -104,59 +52,44 @@ const updateUser = async (id, userData) => {
     if (Object.keys(sanitized).length === 0)
       return { isOK: false, message: "No hay campos válidos para actualizar" };
 
-    await ref.update(sanitized);
+    const result = await facade.updateDocument("users", id, sanitized);
+
+    if (!result.success) return { isOK: false, message: result.message };
+
     return { isOK: true };
   } catch {
     return { isOK: false, message: "Error al actualizar los datos" };
   }
 };
 
-// 🔹 Eliminar (lógicamente) un usuario
+// Eliminar (lógicamente) un usuario
 const deleteUser = async (id) => {
   try {
-    const ref = db.collection("users").doc(id);
-    const snap = await ref.get();
-    if (!snap.exists)
-      return { isOK: false, message: "No se encontró el usuario" };
+    const result = await facade.deleteDocument("users", id);
 
-    await ref.update({ state: false });
+    if (!result.success) return { isOK: false, message: result.message };
+
     return { isOK: true };
   } catch {
     return { isOK: false, message: "Error al eliminar al usuario" };
   }
 };
 
-// 🔹 Obtener un usuario por ID
+// Obtener un usuario por ID
 const updateUserById = async (id, userData) => {
   return updateUser(id, userData);
 };
 
-// 🔹 Obtener el usuario actual por su UID
+// Obtener el usuario actual por su UID
 const getCurrentUser = async (uid) => {
   try {
-    const ref = db.collection("users").doc(uid);
-    const snap = await ref.get();
-    if (!snap.exists) return { isOK: false, message: "Usuario no encontrado" };
+    const user = await facade.getDocumentById("users", uid);
 
-    const data = snap.data();
-    const user = {
-      id: snap.id,
-      userType: data.userType,
-      fullName: data.fullName,
-      email: data.email,
-      state: data.state,
-    };
+    if (!user) return { isOK: false, message: "Usuario no encontrado" };
 
-    if (data.phone) user.phone = data.phone;
-    if (data.dni) user.dni = data.dni;
-    if (data.gender) user.gender = data.gender;
-    if (data.insurance) user.insurance = data.insurance;
-    if (data.communication) user.communication = data.communication;
-    if (data.birthDate) user.birthDate = formatDate(data.birthDate); // ✅ Conversión
-    if (data.profilePicture) user.profilePicture = data.profilePicture;
-    if (data.secretQuestion) user.secretQuestion = data.secretQuestion;
+    const formattedUser = facade.formatDatesInDocument(user, ["birthDate"]);
 
-    return { isOK: true, data: user };
+    return { isOK: true, data: formattedUser };
   } catch {
     return { isOK: false, message: "Error al obtener el usuario actual" };
   }
@@ -168,5 +101,5 @@ module.exports = {
   deleteUser,
   updateUserById,
   getCurrentUser,
-  getUserById, // ✅ Exportar
+  getUserById,
 };

@@ -30,35 +30,33 @@ const login = async (req, res) => {
     if (!email || !password)
       return res.status(400).json({ message: "Faltan credenciales" });
 
-    const userDoc = await AuthModel.searchUser(email);
-    if (!userDoc)
+    const user = await AuthModel.searchUser(email); // <- directamente
+
+    if (!user)
       return res.status(404).json({ message: "Usuario no encontrado" });
 
-    const user = userDoc.data();
     if (password !== user.password)
       return res
         .status(401)
         .json({ message: "Usuario y/o Contraseña incorrecta" });
 
     const payload = {
-      id: userDoc.id,
+      id: user.id,
       email: user.email,
       userType: user.userType,
+      birthDate: user.birthDate ? formatDate(user.birthDate) : null,
+      communication: user.communication ?? null,
+      dni: user.dni ?? null,
+      gender: user.gender ?? null,
+      insurance: user.insurance ?? null,
+      fullName: user.fullName ?? null,
+      profilePicture: user.profilePicture ?? null,
+      secretQuestion: user.secretQuestion ?? null,
+      phone: user.phone ?? null,
     };
 
     const secret = process.env.JWT_SECRET;
     const token = jwt.sign(payload, secret, { expiresIn: "2h" });
-
-    // 🔹 Conversión de fecha a DD/MM/YYYY
-    payload.birthDate = formatDate(user.birthDate);
-    payload.communication = user.communication ?? null;
-    payload.dni = user.dni ?? null;
-    payload.gender = user.gender ?? null;
-    payload.insurance = user.insurance ?? null;
-    payload.fullName = user.fullName ?? null;
-    payload.profilePicture = user.profilePicture ?? null;
-    payload.secretQuestion = user.secretQuestion ?? null;
-    payload.phone = user.phone ?? null;
 
     return res.status(200).json({
       message: "Login exitoso",
@@ -66,9 +64,11 @@ const login = async (req, res) => {
       user: payload,
     });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Error al iniciar sesión", error: String(error) });
+    console.error("Error al iniciar sesión:", error);
+    return res.status(500).json({
+      message: "Error al iniciar sesión",
+      error: String(error),
+    });
   }
 };
 
