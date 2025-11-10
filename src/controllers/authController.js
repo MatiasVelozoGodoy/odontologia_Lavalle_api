@@ -1,34 +1,32 @@
 const AuthModel = require("../models/authModel");
 const jwt = require("jsonwebtoken");
+const { Timestamp } = require("firebase-admin/firestore");
 require("dotenv").config();
 
-/* ESTRUCTURA PARA REGISTRO DE USUARIO
-{
-  birthDate: "7 de julio de 2000, 12:00:00 a.m. UTC-3",
-  dni: 44444444,
-  email: "alinesilva@gmail.com",
-  gender: "Femenino",
-  fullName: "Aline Silva",
-  insurance: "OSDE",
-  password: "aline123",
-  profilePicture: "https://randomuser.me/api/portraits/women/21.jpg",
-  userType: "cliente",
-  phone: 3794111111
-}
-*/
-
-// utilitario: intenta convertir fechas a ISO si se puede
-function tryParseDate(input) {
+// 🔹 Convierte string → Timestamp o devuelve null
+function parseDate(input) {
   if (!input) return null;
   const d = new Date(input);
-  if (!isNaN(d.getTime())) return d.toISOString();
-  return input;
+  if (isNaN(d.getTime())) return null;
+  return Timestamp.fromDate(d);
 }
 
+// 🔹 Convierte Timestamp a DD/MM/YYYY
+function formatDate(timestamp) {
+  if (!timestamp || !timestamp.toDate) return null;
+  const date = timestamp.toDate();
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+// ===================================================
+// 🔹 LOGIN
+// ===================================================
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password)
       return res.status(400).json({ message: "Faltan credenciales" });
 
@@ -37,7 +35,6 @@ const login = async (req, res) => {
       return res.status(404).json({ message: "Usuario no encontrado" });
 
     const user = userDoc.data();
-
     if (password !== user.password)
       return res
         .status(401)
@@ -52,14 +49,13 @@ const login = async (req, res) => {
     const secret = process.env.JWT_SECRET;
     const token = jwt.sign(payload, secret, { expiresIn: "2h" });
 
-    // añadimos todos los campos del usuario a la respuesta
-    payload.birthDate = user.birthDate ?? null;
+    // 🔹 Conversión de fecha a DD/MM/YYYY
+    payload.birthDate = formatDate(user.birthDate);
     payload.communication = user.communication ?? null;
     payload.dni = user.dni ?? null;
     payload.gender = user.gender ?? null;
-    payload.lastname = user.lastname ?? null;
     payload.insurance = user.insurance ?? null;
-    payload.name = user.name ?? null;
+    payload.fullName = user.fullName ?? null;
     payload.profilePicture = user.profilePicture ?? null;
     payload.secretQuestion = user.secretQuestion ?? null;
     payload.phone = user.phone ?? null;
@@ -76,6 +72,9 @@ const login = async (req, res) => {
   }
 };
 
+// ===================================================
+// 🔹 REGISTER (ya estaba bien, solo verifico)
+// ===================================================
 const register = async (req, res) => {
   try {
     const {
@@ -92,7 +91,6 @@ const register = async (req, res) => {
       phone,
     } = req.body;
 
-    // validaciones minimas
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email))
       return res.status(400).json({ message: "Email inválido" });
@@ -111,8 +109,9 @@ const register = async (req, res) => {
     if (existingUser)
       return res.status(400).json({ message: "El email ya está registrado" });
 
+    // ✅ Convertir birthDate a Timestamp
     const newUser = {
-      birthDate: tryParseDate(birthDate),
+      birthDate: parseDate(birthDate),
       communication: communication || null,
       dni: dni || null,
       email,
@@ -128,11 +127,13 @@ const register = async (req, res) => {
     };
 
     const docRef = await AuthModel.addUser(newUser);
+
     return res.status(200).json({
       message: "Usuario registrado correctamente",
       id: docRef.id,
     });
   } catch (error) {
+    console.error("Error en registro:", error);
     return res.status(500).json({
       message: "Error al registrar usuario",
       error: String(error),
@@ -140,6 +141,9 @@ const register = async (req, res) => {
   }
 };
 
+// ===================================================
+// 🔹 RESET PASSWORD
+// ===================================================
 const resetPassword = async (req, res) => {
   try {
     const { email } = req.body;
